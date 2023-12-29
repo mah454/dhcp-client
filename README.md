@@ -29,6 +29,6 @@ by default work on interface wlan0
 
 ```c
 int main() {
-discover_dhcp_ip("wlan0");
+    discover_dhcp_ip("wlan0");
 }
 ```
