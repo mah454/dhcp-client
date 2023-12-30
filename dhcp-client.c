@@ -15,11 +15,6 @@
 
 #include "compat.h"
 
-/* The xid is redundant on ethernet and wireless networks since we
- * have a MAC. Since the xid is client only, just hardcode it.
- */
-#define XID 0x21433412
-
 #define BROADCAST (1 << 7)
 
 struct bootp {
