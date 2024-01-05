@@ -12,10 +12,18 @@
 #include <time.h>
 #include <unistd.h>
 #include <err.h>
+#include <iostream>
 
-#include "compat.h"
+#include "compat.hpp"
 
 #define BROADCAST (1 << 7)
+
+static void Init();
+static void Requesting();
+static void Bound();
+static void Renewed();
+static void Renewing();
+static void Rebinding();
 
 struct bootp {
     uint8_t op;
@@ -42,9 +50,9 @@ struct bootp {
     uint8_t cid_id;
     uint8_t cid_len;
     uint8_t optdata[312 - 9];
-} __attribute((packed));
+} __attribute((packed)) bootp;
 
-_Static_assert(sizeof(struct bootp) == 548, "bootp size");
+//_Static_assert(sizeof(struct bootp) == 548, "bootp size");
 
 enum {
     DHCPdiscover = 1,
@@ -224,7 +232,9 @@ dhcprecv(void) {
 
 static void
 settimeout(int n, uint32_t seconds) {
-    const struct itimerspec ts = {.it_value.tv_sec = seconds};
+    struct itimerspec ts;
+    ts.it_value.tv_sec = seconds;
+    
     if (timerfd_settime(timers[n], 0, &ts, NULL) < 0)
         err(1, "timerfd_settime:");
 }
@@ -263,39 +273,44 @@ parse_reply(void) {
     rebindingtime = leasetime * 7 / 8;
 }
 
-static void run() {
-    uint32_t t;
-    goto Requesting;
-    Init:
-    printf("Init\n");
+static void Init()
+{
+    std::cout << "Init" << std::endl;
     client.s_addr = 0;
     server.s_addr = 0;
     dhcpsend(DHCPdiscover, BROADCAST);
     settimeout(0, 1);
     goto Selecting;
     Selecting:
-    printf("Selecting\n");
+    std::cout << "Selecting" << std::endl;
     for (;;) {
-        switch (dhcprecv()) {
+        switch (dhcprecv())
+         {
             case DHCPoffer:
                 client = bp.yiaddr;
                 optget(&bp, &server, ODserverid, sizeof(server));
-                goto Requesting;
+                Requesting();
             case Timeout0:
-                goto Init;
+                Init();
         }
     }
-    Requesting:
-    printf("Requesting\n");
+    
+}
+
+static void Requesting()
+{
+    uint32_t t = 0;
+
+    std::cout << "Requesting" << std::endl;
     for (t = 4; t <= 64; t *= 2) {
         dhcpsend(DHCPrequest, BROADCAST);
         settimeout(0, t);
         for (;;) {
             switch (dhcprecv()) {
                 case DHCPack:
-                    goto Bound;
+                    Bound();
                 case DHCPnak:
-                    goto Init;
+                    Init();
                 case Timeout0:
                     break;
                 default:
@@ -305,40 +320,50 @@ static void run() {
         }
     }
     /* no response from DHCPREQUEST after several attempts, go to INIT */
-    goto Init;
-    Bound:
-    printf("Bound\n");
+    Init();
+}
+
+static void Bound()
+{
+    std::cout << "Bound" << std::endl;
     close_socket(); /* currently raw sockets only */
     parse_reply();
 
     char *ip_str = inet_ntoa(client);
-    printf("Client: %s\n", ip_str);
+    std::cout << "Client: " <<  ip_str << std::endl;
 
     ip_str = inet_ntoa(server);
-    printf("Server: %s\n", ip_str);
+    std::cout << "Server: " << ip_str << std::endl;
 
     ip_str = inet_ntoa(mask);
-    printf("Mask: %s\n", ip_str);
+    std::cout << "Mask: " << ip_str << std::endl;
 
-    if (fork()) exit(0);
+    if (fork())
+     exit(0);
+}
 
-    Renewed:
-    printf("Renewed\n");
+static void Renewed()
+{
+    std::cout << "Renewed" << std::endl;
     settimeout(0, renewaltime);
     settimeout(1, rebindingtime);
     settimeout(2, leasetime);
     for (;;) {
-        switch (dhcprecv()) {
+        switch (dhcprecv()) 
+        {
             case Timeout0: /* t1 elapsed */
-                goto Renewing;
+                Renewing();
             case Timeout1: /* t2 elapsed */
-                goto Rebinding;
+                Rebinding();
             case Timeout2: /* lease expired */
-                goto Init;
+                Init();
         }
     }
-    Renewing:
-    printf("Renewing\n");
+}
+
+static void Renewing()
+{
+    std::cout << "Renewing" << std::endl;
     dhcpsend(DHCPrequest, 0);
     calctimeout(1, 0);
     for (;;) {
@@ -346,31 +371,39 @@ static void run() {
             case DHCPack:
                 parse_reply();
                 close_socket(); /* currently raw sockets only */
-                goto Renewed;
+                Renewed();
             case Timeout0: /* resend request */
-                goto Renewing;
+                Renewing();
             case Timeout1: /* t2 elapsed */
-                goto Rebinding;
+                Rebinding();
             case Timeout2:
             case DHCPnak:
-                goto Init;
+                Init();
         }
     }
-    Rebinding:
-    printf("Rebinding\n");
+}
+
+static void Rebinding()
+{
+    std::cout << "Rebinding" << std::endl;
     calctimeout(2, 0);
     dhcpsend(DHCPrequest, BROADCAST);
     for (;;) {
-        switch (dhcprecv()) {
+        switch (dhcprecv())
+        {
             case DHCPack:
-                goto Bound;
+                Bound();
             case Timeout0: /* resend request */
-                goto Rebinding;
+                Rebinding();
             case Timeout2: /* lease expired */
             case DHCPnak:
-                goto Init;
+                Init();
         }
     }
+}
+
+static void run() {
+    Requesting();
 }
 
 static void

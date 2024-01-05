@@ -1,19 +1,19 @@
 VERSION   = 0.1
 
-CC        = cc
+CC        = g++
 LD        = $(CC)
 CPPFLAGS  = -D_DEFAULT_SOURCE
 CFLAGS    = -Wall -Wextra -pedantic -std=c99 $(CPPFLAGS)
 LDFLAGS   = -s
 
 .POSIX:
-.SUFFIXES: .c .o
+.SUFFIXES: .cpp .o
 
-HDR = compat.h
+HDR = compat.hpp
 
-SRC = dhcp-client.c compat.c
+SRC = dhcp-client.cpp compat.cpp
 
-OBJ = $(SRC:.c=.o)
+OBJ = $(SRC:.cpp=.o)
 BIN = dhcp-client
 MAN = $(BIN).1
 

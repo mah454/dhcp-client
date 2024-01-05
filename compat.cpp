@@ -13,7 +13,8 @@
 #include <netinet/udp.h>
 #include <linux/if_packet.h>
 #include <stdlib.h>
-#include "compat.h"
+#include <iostream>
+#include "compat.hpp"
 
 #define BOOTP_SIZE (236 + 312)
 static uint8_t hwaddr[ETHER_ADDR_LEN];
@@ -64,7 +65,7 @@ void create_timers(int recreate) {    /* timerfd survives a fork, don't need to 
 /* RFC 1071. */
 static uint16_t chksum16(const void *buf, int count) {
     int32_t sum = 0, shift;
-    const uint16_t *p = buf;
+    const uint16_t *p = (uint16_t*)buf;
 
     while (count > 1) {
         sum += *p++;
